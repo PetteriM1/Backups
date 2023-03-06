@@ -20,6 +20,7 @@ public class App {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("-dd-MM-yyyy-HH-mm-ss");
 
     public static void main(String[] args) throws IOException {
+        System.out.print((char) 0x1b + "]0;Backups" + (char) 0x07);
         log("Backups by PetteriM1");
         log("--------------------");
         log("Loading config...");
