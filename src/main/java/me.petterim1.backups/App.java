@@ -42,18 +42,22 @@ public class App {
         Scanner scanner = new Scanner(System.in);
         log("Started! You can type 'backup' to start manual backup or 'stop' to quit.");
         while (true) {
-            String cmd = scanner.nextLine();
-            if ("backup".equalsIgnoreCase(cmd)) {
-                SCHEDULER.execute(App::doBackups);
-            } else if ("stop".equalsIgnoreCase(cmd)) {
-                log("Stopping...");
-                SCHEDULER.shutdown();
-                try {
-                    SCHEDULER.awaitTermination(5, TimeUnit.MINUTES);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+            try {
+                String cmd = scanner.nextLine();
+                if ("backup".equalsIgnoreCase(cmd)) {
+                    SCHEDULER.execute(App::doBackups);
+                } else if ("stop".equalsIgnoreCase(cmd)) {
+                    log("Stopping...");
+                    SCHEDULER.shutdown();
+                    try {
+                        SCHEDULER.awaitTermination(5, TimeUnit.MINUTES);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    System.exit(0);
                 }
-                System.exit(0);
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
         }
     }
@@ -77,7 +81,8 @@ public class App {
             secondaryBackup(zip);
             System.gc();
         } catch (Exception ex) {
-            throw new RuntimeException("Backup failed!", ex);
+            log("Backup failed!");
+            ex.printStackTrace();
         }
     }
 
