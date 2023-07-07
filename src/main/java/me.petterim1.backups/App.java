@@ -1,6 +1,8 @@
 package me.petterim1.backups;
 
 import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.model.enums.CompressionLevel;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -47,7 +49,7 @@ public class App {
                 log("Stopping...");
                 SCHEDULER.shutdown();
                 try {
-                    SCHEDULER.awaitTermination(2, TimeUnit.MINUTES);
+                    SCHEDULER.awaitTermination(5, TimeUnit.MINUTES);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -67,11 +69,41 @@ public class App {
             File targetFolder = new File(CONFIG.getProperty("target_folder"));
             targetFolder.mkdir();
             ZipFile zip = new ZipFile(new File(targetFolder.getPath() + "/" + sourceFolder.getName() + DATE_FORMAT.format(new Date(System.currentTimeMillis())) + ".zip"));
-            zip.addFolder(sourceFolder); // TODO: use ZipParameters, config for compression, password, etc.
+            ZipParameters parameters = new ZipParameters();
+            parameters.setCompressionLevel(CompressionLevel.HIGHER); // TODO: config
+            zip.addFolder(sourceFolder, parameters);
             log("Backup finished: " + zip);
             deleteOldBackups(targetFolder);
+            secondaryBackup(zip);
+            System.gc();
         } catch (Exception ex) {
             throw new RuntimeException("Backup failed!", ex);
+        }
+    }
+
+    private static void secondaryBackup(ZipFile zip) throws IOException {
+        String secondaryTargetPath = CONFIG.getProperty("secondary_target");
+        if (secondaryTargetPath.trim().length() > 1) {
+            if (SCHEDULER.isShutdown() || SCHEDULER.isTerminated()) {
+                log("Skipping secondary backup update due to shutdown");
+                return;
+            }
+            log("Updating secondary backup...");
+            File targetFolder = new File(secondaryTargetPath);
+            targetFolder.mkdir();
+            File[] files = targetFolder.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file != null && file.isFile() && file.getName().toLowerCase().endsWith(".zip")) {
+                        if (file.delete()) {
+                            log("Deleted old secondary backup: " + file.getName());
+                        }
+                    }
+                }
+            }
+            log("Copying backup...");
+            Files.copy(zip.getFile().toPath(), Paths.get(targetFolder.getPath() + File.separatorChar + zip.getFile().getName()));
+            log("Done!");
         }
     }
 
