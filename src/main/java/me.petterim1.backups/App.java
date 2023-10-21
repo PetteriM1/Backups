@@ -8,9 +8,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Properties;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +34,7 @@ public class App {
     }
 
     private static void enterLoop() {
-        int hours = Integer.parseInt(CONFIG.getProperty("backup_hours"));
+        int hours = Integer.parseInt(CONFIG.getProperty("backup_hours", ""));
         log("Starting backup task with " + hours + " hours delay...");
         SCHEDULER.scheduleAtFixedRate(App::doBackups, hours, hours, TimeUnit.HOURS);
         Scanner scanner = new Scanner(System.in);
@@ -65,17 +63,38 @@ public class App {
     private static void doBackups() {
         log("Creating backup...");
         try {
-            File sourceFolder = new File(CONFIG.getProperty("source_folder"));
+            File sourceFolder = new File(CONFIG.getProperty("source_folder", ""));
             if (!sourceFolder.isDirectory()) {
                 log("Backup failed! source_folder is not a directory");
                 return;
             }
-            File targetFolder = new File(CONFIG.getProperty("target_folder"));
+            File[] files = sourceFolder.listFiles();
+            if (files == null) {
+                log("Backup failed! Could not read source_folder");
+                return;
+            }
+            File targetFolder = new File(CONFIG.getProperty("target_folder", ""));
             targetFolder.mkdir();
             ZipFile zip = new ZipFile(new File(targetFolder.getPath() + "/" + sourceFolder.getName() + DATE_FORMAT.format(new Date(System.currentTimeMillis())) + ".zip"));
             ZipParameters parameters = new ZipParameters();
             parameters.setCompressionLevel(CompressionLevel.HIGHER); // TODO: config
-            zip.addFolder(sourceFolder, parameters);
+            List<String> ignored = Arrays.asList(CONFIG.getProperty("ignored", "").split(";"));
+            List<File> finalFilesToArchive = new ArrayList<>();
+            List<File> finalFoldersToArchive = new ArrayList<>();
+            for (File file : files) {
+                if (ignored.contains(file.getName())) {
+                    continue;
+                }
+                if (file.isDirectory()) {
+                    finalFoldersToArchive.add(file);
+                } else {
+                    finalFilesToArchive.add(file);
+                }
+            }
+            zip.addFiles(finalFilesToArchive, parameters);
+            for (File folder : finalFoldersToArchive) {
+                zip.addFolder(folder, parameters);
+            }
             log("Backup finished: " + zip);
             deleteOldBackups(targetFolder);
             secondaryBackup(zip);
@@ -87,7 +106,7 @@ public class App {
     }
 
     private static void secondaryBackup(ZipFile zip) throws IOException {
-        String secondaryTargetPath = CONFIG.getProperty("secondary_target");
+        String secondaryTargetPath = CONFIG.getProperty("secondary_target", "");
         if (secondaryTargetPath.trim().length() > 1) {
             if (SCHEDULER.isShutdown() || SCHEDULER.isTerminated()) {
                 log("Skipping secondary backup update due to shutdown");
@@ -114,7 +133,7 @@ public class App {
 
     private static void deleteOldBackups(File targetFolder) {
         log("Deleting old backups...");
-        int hours = Integer.parseInt(CONFIG.getProperty("keep_old_hours"));
+        int hours = Integer.parseInt(CONFIG.getProperty("keep_old_hours", ""));
         int count = 0;
         File[] files = targetFolder.listFiles();
         if (files != null) {
@@ -167,10 +186,10 @@ public class App {
 
     private static void checkConfig() {
         try {
-            if (Integer.parseInt(CONFIG.getProperty("backup_hours")) < 1) throw new RuntimeException("backup_hours must be a positive integer");
-            if (Integer.parseInt(CONFIG.getProperty("keep_old_hours")) < 1) throw new RuntimeException("keep_old_hours must be a positive integer");
-            if (CONFIG.getProperty("source_folder").isEmpty()) throw new RuntimeException("source_folder must not be empty");
-            if (CONFIG.getProperty("target_folder").isEmpty()) throw new RuntimeException("target_folder must not be empty");
+            if (Integer.parseInt(CONFIG.getProperty("backup_hours", "")) < 1) throw new RuntimeException("backup_hours must be a positive integer");
+            if (Integer.parseInt(CONFIG.getProperty("keep_old_hours", "")) < 1) throw new RuntimeException("keep_old_hours must be a positive integer");
+            if (CONFIG.getProperty("source_folder", "").isEmpty()) throw new RuntimeException("source_folder must not be empty");
+            if (CONFIG.getProperty("target_folder", "").isEmpty()) throw new RuntimeException("target_folder must not be empty");
         } catch (NumberFormatException ex) {
             throw new RuntimeException("Failed to parse integer", ex);
         }

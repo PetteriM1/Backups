@@ -3,3 +3,4 @@ keep_old_hours=240
 source_folder=
 target_folder=
 secondary_target=
+ignored=
