@@ -77,7 +77,7 @@ public class App {
             targetFolder.mkdir();
             ZipFile zip = new ZipFile(new File(targetFolder.getPath() + "/" + sourceFolder.getName() + DATE_FORMAT.format(new Date(System.currentTimeMillis())) + ".zip"));
             ZipParameters parameters = new ZipParameters();
-            parameters.setCompressionLevel(CompressionLevel.HIGHER); // TODO: config
+            parameters.setCompressionLevel(CompressionLevel.ULTRA); // TODO: config
             List<String> ignored = Arrays.asList(CONFIG.getProperty("ignored", "").split(";"));
             List<File> finalFilesToArchive = new ArrayList<>();
             List<File> finalFoldersToArchive = new ArrayList<>();
